@@ -26,9 +26,7 @@ class AccountZero(models.models):
                         raise UserError(_('Journal Items of {account} should have a label in order to generate an asset').format(account=move_line.account_id.display_name))
                     if move_line.account_id.multiple_assets_per_line:
                         # decimal quantities are not supported, quantities are rounded to the lower int
-                        units_quantity = max(1, int(move_line.quantity))
-                    else:
-                        units_quantity = 1
+                        units_quantity = max(0, int(move_line.quantity))
                     vals = {
                         'name': move_line.name,
                         'company_id': move_line.company_id.id,
