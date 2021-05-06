@@ -1,63 +1,40 @@
-from odoo import models, _
-from odoo.exceptions import UserError
+from datetime import datetime, timedelta
+from functools import partial
+from itertools import groupby
 
-class AccountZero(models.models):
-    _inherit = 'account.move'
-    
-    def _auto_create_asset(self):
-        create_list = []
-        invoice_list = []
-        auto_validate = []
-        for move in self:
-            if not move.is_invoice():
+from odoo import api, fields, models, SUPERUSER_ID, _
+from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.tools.misc import formatLang, get_lang
+from odoo.osv import expression
+from odoo.tools import float_is_zero, float_compare
+
+from werkzeug.urls import url_encode
+
+
+class SaleOrder(models.Model):
+    _inherit = "sale.order"
+    def _get_invoiceable_lines(self, final=False):
+        """Return the invoiceable lines for order `self`."""
+        down_payment_line_ids = []
+        invoiceable_line_ids = []
+        pending_section = None
+        precision = self.env['decimal.precision'].precision_get('Product Unit of Measure')
+
+        for line in self.order_line:
+            if line.display_type == 'line_section':
+                # Only invoice the section if one of its lines is invoiceable
+                pending_section = line
                 continue
-
-            for move_line in move.line_ids.filtered(lambda line: not (move.move_type in ('out_invoice', 'out_refund') and line.account_id.user_type_id.internal_group == 'asset')):
-                if (
-                    move_line.account_id
-                    and (move_line.account_id.can_create_asset)
-                    and move_line.account_id.create_asset != "no"
-                    and not move.reversed_entry_id
-                    and not (move_line.currency_id or move.currency_id).is_zero(move_line.price_total)
-                    and not move_line.asset_ids
-                    and move_line.price_total >= 0
-                ):
-                    if not move_line.name:
-                        raise UserError(_('Journal Items of {account} should have a label in order to generate an asset').format(account=move_line.account_id.display_name))
-                    if move_line.account_id.multiple_assets_per_line:
-                        # decimal quantities are not supported, quantities are rounded to the lower int
-                        units_quantity = max(0, int(move_line.quantity))
-                    vals = {
-                        'name': move_line.name,
-                        'company_id': move_line.company_id.id,
-                        'currency_id': move_line.company_currency_id.id,
-                        'account_analytic_id': move_line.analytic_account_id.id,
-                        'analytic_tag_ids': [(6, False, move_line.analytic_tag_ids.ids)],
-                        'original_move_line_ids': [(6, False, move_line.ids)],
-                        'state': 'draft',
-                    }
-                    model_id = move_line.account_id.asset_model
-                    if model_id:
-                        vals.update({
-                            'model_id': model_id.id,
-                        })
-                    auto_validate.extend([move_line.account_id.create_asset == 'validate'] * units_quantity)
-                    invoice_list.extend([move] * units_quantity)
-                    create_list.extend([vals] * units_quantity)
-
-        assets = self.env['account.asset'].create(create_list)
-        for asset, vals, invoice, validate in zip(assets, create_list, invoice_list, auto_validate):
-            if 'model_id' in vals:
-                asset._onchange_model_id()
-                if validate:
-                    asset.validate()
-            if invoice:
-                asset_name = {
-                    'purchase': _('Asset'),
-                    'sale': _('Deferred revenue'),
-                    'expense': _('Deferred expense'),
-                }[asset.asset_type]
-                msg = _('%s created from invoice') % (asset_name)
-                msg += ': <a href=# data-oe-model=account.move data-oe-id=%d>%s</a>' % (invoice.id, invoice.name)
-                asset.message_post(body=msg)
-        return assets
+            if line.display_type != 'line_note' and float_is_zero(line.qty_to_invoice, precision_digits=precision):
+                continue
+            if line.qty_to_invoice > 0 or (line.qty_to_invoice < 0 and final) or line.display_type == 'line_note':
+            if line.qty_to_invoice >= 0 or (line.qty_to_invoice < 0 and final) or line.display_type == 'line_note':
+                if line.is_downpayment:
+                    # Keep down payment lines separately, to put them together
+                    # at the end of the invoice, in a specific dedicated section.
+                    down_payment_line_ids.append(line.id)
+                    continue
+                if pending_section:
+                    invoiceable_line_ids.append(pending_section.id)
+                    pending_section = None
+                invoiceable_line_ids.append(line.id)
