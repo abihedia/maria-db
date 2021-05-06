@@ -63,7 +63,7 @@ class SaleOrderLineInherit(models.Model):
                 line.invoice_status = 'no'
             elif line.is_downpayment and line.untaxed_amount_to_invoice == 0:
                 line.invoice_status = 'invoiced'
-            elif line.qty_to_invoice >=0:
+            elif line.qty_to_invoice >= 0:
                 line.invoice_status = 'to invoice'
             elif line.state == 'sale' and line.product_id.invoice_policy == 'order' and\
                     float_compare(line.qty_delivered, line.product_uom_qty, precision_digits=precision) == 1:
