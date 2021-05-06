@@ -25,9 +25,9 @@ class SaleOrder(models.Model):
                 # Only invoice the section if one of its lines is invoiceable
                 pending_section = line
                 continue
-            if line.display_type != 'line_note' and float_is_zero(line.qty_to_invoice, precision_digits=precision):
-                continue
-            if line.qty_to_invoice > 0 or (line.qty_to_invoice < 0 and final) or line.display_type == 'line_note':
+            #if line.display_type != 'line_note' and float_is_zero(line.qty_to_invoice, precision_digits=precision):
+                #continue
+            #if line.qty_to_invoice > 0 or (line.qty_to_invoice < 0 and final) or line.display_type == 'line_note':
             if line.qty_to_invoice >= 0 or (line.qty_to_invoice < 0 and final) or line.display_type == 'line_note':
                 if line.is_downpayment:
                     # Keep down payment lines separately, to put them together
