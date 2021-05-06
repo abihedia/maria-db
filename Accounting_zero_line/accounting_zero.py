@@ -11,7 +11,7 @@ from odoo.tools import float_is_zero, float_compare
 from werkzeug.urls import url_encode
 
 
-class SaleOrder(models.Model):
+class SaleOrderInherit(models.Model):
     _inherit = "sale.order"
     def _get_invoiceable_lines(self, final=False):
         """Return the invoiceable lines for order `self`."""
@@ -39,7 +39,7 @@ class SaleOrder(models.Model):
                     pending_section = None
                 invoiceable_line_ids.append(line.id)
 
-class SaleOrderLine(models.Model):
+class SaleOrderLineInherit(models.Model):
     _inherit = 'sale.order.line'
     
     @api.depends('state', 'product_uom_qty', 'qty_delivered', 'qty_to_invoice', 'qty_invoiced')
