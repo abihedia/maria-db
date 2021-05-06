@@ -39,6 +39,9 @@ class SaleOrder(models.Model):
                     pending_section = None
                 invoiceable_line_ids.append(line.id)
 
+class SaleOrderLine(models.Model):
+    _inherit = 'sale.order.line'
+    
     @api.depends('state', 'product_uom_qty', 'qty_delivered', 'qty_to_invoice', 'qty_invoiced')
     def _compute_invoice_status(self):
         """
